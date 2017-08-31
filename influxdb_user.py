@@ -19,8 +19,8 @@ def connect(module):
     client = InfluxDBClient(
         host=module.params['hostname'],
         port=module.params['port'],
-        username=module.params['user'],
-        password=module.params['password'],
+        username=module.params['authuser'],
+        password=module.params['authpass'],
     )
     return client
 
