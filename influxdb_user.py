@@ -8,6 +8,7 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 
 try:
     from influxdb import InfluxDBClient
+    from influxdb.exceptions import InfluxDBClientError
     HAS_INFLUXDB = True
 except ImportError:
     HAS_INFLUXDB = False
@@ -33,7 +34,7 @@ def del_user(client, user, check):
     '''Delete and existing user'''
     if not check:
         client.drop_user(user)
-    
+
 def make_admin(client, user, check):
     '''Make an existing user an admin'''
     if not check:
@@ -43,7 +44,7 @@ def set_pass(client, user, passwd, check):
     '''Set an existing users password'''
     if not check:
         client.set_user_password(user, passwd)
-        
+
 def main():
     module = AnsibleModule(
         argument_spec=dict(
@@ -66,17 +67,24 @@ def main():
     client = connect(module)
 
     # Gather current user state
-    users = client.get_list_users()
-    user_dict = [user for user in users if user['user'] == module.params['user']]
-    if len(user_dict) == 1:
-        user_dict = user_dict[0]
-        user_admin = user_dict['admin']
-    else:
-        user_dict = None
-        user_admin = None
+    try:
+        users = client.get_list_users()
+        user_dict = [user for user in users if user['user'] == module.params['user']]
+        if len(user_dict) == 1:
+            user_dict = user_dict[0]
+            user_admin = user_dict['admin']
+        else:
+            user_dict = None
+            user_admin = None
+    except InfluxDBClientError as err:
+        if err.code == 403:
+            user_dict = None
+            user_admin = None
+        else:
+            module.fail_json(msg=err.content)
 
     changed = False
-    
+
     if module.params['state'] == 'present':
         if user_dict == None:
             changed = True
